@@ -45,6 +45,11 @@ function postNetwork(string $uri, string $body, ?int $timestamp = null, ?string 
     return callNetwork('POST', $uri, $body, $timestamp, $secret, $sign);
 }
 
+function getNetwork(string $uri, ?int $timestamp = null, ?string $secret = null, bool $sign = true): TestResponse
+{
+    return callNetwork('GET', $uri, '', $timestamp, $secret, $sign);
+}
+
 function callNetwork(string $method, string $uri, string $body = '', ?int $timestamp = null, ?string $secret = null, bool $sign = true): TestResponse
 {
     $timestamp ??= now()->getTimestamp();
