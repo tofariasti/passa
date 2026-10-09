@@ -20,7 +20,10 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class AuthorizePurchase
 {
-    public function __construct(private DeclinePurchase $declinePurchase) {}
+    public function __construct(
+        private DeclinePurchase $declinePurchase,
+        private RecordPurchaseEvent $events,
+    ) {}
 
     /** @return array{status: int, body: array<string, string>} */
     public function handle(AuthorizationMessage $message): array
@@ -84,6 +87,8 @@ final readonly class AuthorizePurchase
                 'http_status' => 200,
                 'response_body' => $body,
             ]);
+
+            $this->events->applyStored($purchase, $company);
 
             return ['status' => 200, 'body' => $body];
         });

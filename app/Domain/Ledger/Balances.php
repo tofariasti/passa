@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Ledger;
 
 use App\Domain\Authorization\OpenHold;
+use App\Enums\CardStatus;
 use App\Enums\PurchaseDecision;
 use App\Enums\PurchaseEventType;
 use App\Models\Card;
@@ -57,5 +58,49 @@ final class Balances
             });
 
         return $balance - $holds;
+    }
+
+    public static function cardAvailable(Card $card, Company $company, CarbonImmutable $moment): int
+    {
+        if ($card->status === CardStatus::Blocked) {
+            return 0;
+        }
+
+        return max(min(self::limitRemaining($card, $moment), self::companyAvailable($company)), 0);
+    }
+
+    public static function captureExceededCeiling(string $mcc, int $authorizedCents, int $capturedCents): bool
+    {
+        if (in_array($mcc, ['5812', '7011', '7512'], true)) {
+            return $capturedCents * 100 > $authorizedCents * 120;
+        }
+
+        return $capturedCents > $authorizedCents;
+    }
+
+    public static function isProblem(Purchase $purchase): bool
+    {
+        $events = PurchaseEvent::query()->where('purchase_id', $purchase->id)->orderBy('id')->get();
+        $cancellation = $events->first(
+            fn (PurchaseEvent $event): bool => $event->type === PurchaseEventType::Cancellation,
+        );
+        $captures = $events->filter(
+            fn (PurchaseEvent $event): bool => $event->type === PurchaseEventType::Capture,
+        );
+        $arrivedAfterCancellation = $cancellation instanceof PurchaseEvent && $captures->contains(
+            fn (PurchaseEvent $event): bool => $event->id > $cancellation->id,
+        );
+
+        if ($arrivedAfterCancellation) {
+            return true;
+        }
+
+        $final = $captures->contains(fn (PurchaseEvent $event): bool => $event->is_final === true);
+
+        if (! $final) {
+            return false;
+        }
+
+        return self::captureExceededCeiling($purchase->mcc, $purchase->amount_cents, (int) $captures->sum('amount_cents'));
     }
 }
