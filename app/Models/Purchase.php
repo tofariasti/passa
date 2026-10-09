@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\UtcInstant;
 use App\Enums\DeclineReason;
 use App\Enums\PurchaseDecision;
 use Illuminate\Database\Eloquent\Model;
@@ -50,7 +51,7 @@ final class Purchase extends Model
     {
         return [
             'amount_cents' => 'integer',
-            'occurred_at' => 'datetime',
+            'occurred_at' => UtcInstant::class,
             'decision' => PurchaseDecision::class,
             'reason' => DeclineReason::class,
         ];

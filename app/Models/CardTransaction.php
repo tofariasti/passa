@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\UtcInstant;
 use App\Enums\CardTransactionType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,7 +37,7 @@ final class CardTransaction extends Model
     protected function casts(): array
     {
         return [
-            'occurred_at' => 'datetime',
+            'occurred_at' => UtcInstant::class,
             'amount_cents' => 'integer',
             'type' => CardTransactionType::class,
         ];
