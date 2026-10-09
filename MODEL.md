@@ -49,9 +49,31 @@ O statement do cartão sai em `occurred_at` crescente e, no empate, `reference` 
 
 ## 3. Riscos e garantias
 
-Os riscos que você identificou neste domínio. Para cada um: o que pode dar errado, o que no seu código impede que aconteça e qual teste prova isso.
+A assinatura errada não pode virar 422. Sem `X-Network-Signature`, com segredo errado, ou com o relógio mais de 300 segundos atrás, a resposta é 401 e o corpo nem é lido. 300 segundos exatos ainda passa, desde que o `occurred_at` não seja posterior ao envio. Provam `rejects a bad signature before reading the body` e `rejects a timestamp outside five minutes and accepts the boundary`.
 
-Fecha quando o código da rede e os testes dessa garantia existirem.
+Contrato quebrado responde 422: amount em texto, float ou zero, país fora de duas letras maiúsculas, `occurred_at` depois do timestamp, corpo vazio. Campo a mais é ignorado. A aprovação da Ana no teto manda um campo `note` e mesmo assim responde 200. Prova `rejects a message that breaks the contract`.
+
+A recusa segue a ordem do enunciado. Igual ao teto, ao limite do mês ou ao saldo aprova. MCC bloqueado vem antes do teto: a Ana com 90.000 em 7995 é `mcc_blocked`. O limite do mês vem antes do saldo: o Diego, depois de reservar os 1.000.000 da empresa, leva `monthly_limit_exceeded` em 4.000.001 e `insufficient_funds` em 1 centavo. A Ana, com mês e teto folgados e saldo zerado, leva `insufficient_funds`. Cartão inexistente é 200 `card_not_found`, sem reserva. Provam `declines for the first reason that applies`, `approves an amount equal to the cap, the remaining limit and the company balance`, `declines for the first matching reason`, `declines the next purchase that passes the monthly limit` e `checks the company balance after the card limit`.
+
+A mesma entrega não reserva duas vezes. O mesmo `id`, dez segundos depois, devolve o JSON já gravado e deixa uma única linha `hold` negativa. Prova `approves an amount equal to the card cap and reserves it once`.
+
+A reserva aberta some no `final` e na cancellation, e não existe se a compra foi recusada. Capture parcial dentro do autorizado não cria outra linha no cartão. A capture final de P2, 86.000 sobre 80.000, gera um `adjustment` de −6.000. Provam `follows the published p2 captures` e `follows the published p3 captures`. A fórmula da reserva, isolada, também está em `releases the hold when the purchase is final or cancelled`.
+
+Event que chega antes da authorization não entra na decisão. A Ana autoriza 60.000 mesmo com uma capture de 150.000 já guardada; o efeito entra depois. Prova `applies an event that arrived before the authorization only after the decision`. Capture final que chega antes da anterior fecha no mesmo total do cartão. Prova `ends at the same card total when the final capture arrives first`.
+
+O mesmo `id` de event devolve a resposta gravada. `id` novo com o mesmo fato não gera outra capture. Prova `returns the stored event and does not apply a reissue`.
+
+Capture depois de cancellation é aceita, aplicada, e a compra é problema. Compra sem `final` não é problema, mesmo quando o capturado já passou do autorizado. Provam `accepts a capture after cancellation and marks the purchase` e `keeps an open purchase off the problem list`.
+
+O teto de 20% é inclusivo: 48.000 sobre 40.000 e 96.000 sobre 80.000 não passam. O centavo seguinte passa. Fora desses MCC, o teto é o autorizado. Prova `keeps the twenty percent ceiling inclusive and the other mccs at the authorized amount`.
+
+Assinatura ruim no event é 401. Contrato quebrado é 422. Provam `rejects a bad event signature before reading the body` e `rejects an event that breaks the contract`.
+
+A consulta também confere a assinatura antes do cartão: mês inválido sem assinatura é 401, não 422. Cartão inexistente é 404. `month` fora de `AAAA-MM` é 422. Mês válido sem linha responde 200, com o limite restante igual ao limite. Sem `month`, vale o mês corrente. Provam `rejects a bad signature before looking up the card`, `rejects an unknown card and a bad month` e `answers an empty month and a blocked card`.
+
+O statement sai em `occurred_at` e, no empate, `reference`. Cada `limit_remaining_after_cents` parte do limite e soma a linha. O último é o `limit_remaining_cents`, igual ao de `/available` no mês corrente. O disponível da Ana, quando o saldo da empresa cabe, é o limite restante. O do Diego, depois da capture final de 86.000, é o saldo disponível da empresa, 914.000, com limite restante 5.000.000. Cartão bloqueado tem disponível zero. Provam `reports the current month and keeps the statement invariant` e `orders lines that share a timestamp by reference`.
+
+Uma linha que já apareceu não muda. Capture de outro mês continua no mês da authorization, em `America/Sao_Paulo`: `2026-10-01T02:30:00Z` ainda é setembro. Provam `keeps an earlier statement line when a later capture joins that month` e `attributes a purchase to the Sao Paulo month of the authorization`.
 
 ## 4. O que eu esperava dos cenários
 
@@ -75,7 +97,7 @@ P3, Bruno, MCC 5812. A capture de 480,00 sobre 400,00 está no limite inclusive 
 | Autorização de 50,00, recusada | 2000 | 2000 | 952000 | não |
 | Autorização de 20,00, aprovada | 0 | 0 | 950000 | não |
 
-Ainda não rodei essas mensagens. O código que aplica authorization e event não existe. Quando rodar, esta seção ganha se bateu e o que mudou.
+Rodei P2 e P3. Os números bateram com as tabelas, e nenhuma das duas compras é problema. A consulta do statement, no mesmo desenho de P2, fecha em 114000 e bate com `/available`. P1 continua no papel: o enunciado não publica as cinco mensagens.
 
 ## 5. O que mudou e o que foi descartado
 
