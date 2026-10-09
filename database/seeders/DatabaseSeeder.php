@@ -20,5 +20,7 @@ final class DatabaseSeeder extends Seeder
             ['email' => 'marina@acme.test'],
             ['name' => 'Marina', 'password' => 'password'],
         );
+
+        $this->call(AcmeSeeder::class);
     }
 }
