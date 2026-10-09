@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /*
@@ -39,7 +40,24 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 |--------------------------------------------------------------------------
 */
 
-function something(): void
+function postNetwork(string $uri, string $body, ?int $timestamp = null, ?string $secret = null, bool $sign = true): TestResponse
 {
-    // ..
+    return callNetwork('POST', $uri, $body, $timestamp, $secret, $sign);
+}
+
+function callNetwork(string $method, string $uri, string $body = '', ?int $timestamp = null, ?string $secret = null, bool $sign = true): TestResponse
+{
+    $timestamp ??= now()->getTimestamp();
+    $server = [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_ACCEPT' => 'application/json',
+        'HTTP_X_NETWORK_TIMESTAMP' => (string) $timestamp,
+    ];
+
+    if ($sign) {
+        $secret ??= (string) config('services.network.secret');
+        $server['HTTP_X_NETWORK_SIGNATURE'] = 'sha256='.hash_hmac('sha256', $timestamp.'.'.$body, $secret);
+    }
+
+    return test()->call($method, $uri, server: $server, content: $body);
 }
