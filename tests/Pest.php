@@ -66,3 +66,24 @@ function callNetwork(string $method, string $uri, string $body = '', ?int $times
 
     return test()->call($method, $uri, server: $server, content: $body);
 }
+
+function authorizationBody(array $overrides = []): string
+{
+    return authorizationBodyJson($overrides);
+}
+
+function authorizationBodyJson(array $overrides): string
+{
+    $payload = array_replace([
+        'id' => 'aut_default',
+        'card_token' => 'tok_ana',
+        'amount_cents' => 1_000,
+        'currency' => 'BRL',
+        'mcc' => '5812',
+        'merchant' => ['name' => 'Padaria', 'city' => 'Porto Alegre', 'country' => 'BR'],
+        'occurred_at' => '2026-10-08T18:00:00Z',
+        'note' => 'ignored',
+    ], $overrides);
+
+    return json_encode($payload, JSON_THROW_ON_ERROR);
+}
