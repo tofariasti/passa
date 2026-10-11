@@ -75,6 +75,10 @@ O statement sai em `occurred_at` e, no empate, `reference`. Cada `limit_remainin
 
 Uma linha que já apareceu não muda. Capture de outro mês continua no mês da authorization, em `America/Sao_Paulo`: `2026-10-01T02:30:00Z` ainda é setembro. Provam `keeps an earlier statement line when a later capture joins that month` e `attributes a purchase to the Sao Paulo month of the authorization`.
 
+O painel lê esses mesmos cálculos. Portador autenticado em `/admin` recebe 403. O depósito da Marina é a única escrita: centavos inteiros de 1 a 100000000, data de agora, sem referência. Ele trava a empresa antes de gravar, e o disponível sobe pelo mesmo cálculo da autorização. O extrato do cartão no painel é o de `ShowCardStatement`. O saldo depois de cada lançamento da empresa parte de zero, na ordem `occurred_at` e id. Compra com problema usa `Balances::isProblem`. Event com `purchase_id` vazio fica na lista própria até a autorização chegar. Provam `refuses a cardholder at the admin panel`, `registers a deposit and raises the company available`, `shows the published p2 figures on the panel`, `lists a declined authorization and its history`, `lists an orphan event until the authorization arrives` e `lists a capture that arrived after cancellation`.
+
+A área do funcionário lê os mesmos cálculos, em `/login` e `/my-card`. O formulário autentica com `Auth::attempt`. Visitante em `/my-card` vai para `/login`. Quem já entrou, ao abrir `/login`, volta para `/my-card`. O cartão é o do usuário autenticado: a URL não leva id, um parâmetro `card_token` é ignorado, e `/my-card/{id}` responde 404. Usuário sem cartão recebe 403. A tela pede os números de novo a cada 4 segundos, dentro do prazo de 5. Provam `sends a guest from my card to the login form`, `logs the cardholder in and returns an authenticated visit to the form`, `rejects a wrong password`, `refuses a user without a card`, `shows only the authenticated card and rejects another card url` e `refreshes the same screen after an authorization and a capture`.
+
 ## 4. O que eu esperava dos cenários
 
 P1 fecha como o enunciado: depois das cinco captures exatas, a Ana fica com disponível e limite restante 143000, o statement dela fecha em 143000, e o Diego fica com disponível 943000 e limite restante 5000000. Nenhuma compra é problema. A reserva e a capture do mesmo valor não se somam duas vezes.
@@ -101,6 +105,24 @@ Rodei P2 e P3. Os números bateram com as tabelas, e nenhuma das duas compras é
 
 ## 5. O que mudou e o que foi descartado
 
-Alterações relevantes do modelo ao longo do caminho, com o motivo. E o que o seu primeiro rascunho, ou a IA, propôs e você não aceitou.
+As dez decisões ficaram como foram escritas. Três ajustes de implementação entraram para o texto continuar igual ao código.
 
-Fecha quando houver código para comparar com este texto.
+O instante da rede é gravado em UTC. A primeira leitura tratava o `occurred_at` como horário de São Paulo e mudava o mês da compra. O cast `UtcInstant` deixa `2026-10-01T02:30:00Z` em setembro, que é a decisão 7. Prova `attributes a purchase to the Sao Paulo month of the authorization`.
+
+O depósito da Marina não estava no primeiro texto. Ficou de 1 a 100000000 centavos, com data de agora e sem referência, travando a empresa antes de gravar. P2 e P3 continuam em cima do depósito inicial de R$ 10.000. Prova `registers a deposit and raises the company available`.
+
+A área do funcionário não ganhou cálculo. Ela chama as mesmas consultas do painel e da rede. O polling é de 4 segundos, dentro do prazo de 5.
+
+Ficou de fora de propósito:
+
+- Uma tabela só para a decisão, a linha de extrato e o event. A decisão não muda, a linha não muda, e o event ainda pode chegar.
+- Statement só com o capturado. No P2 o limite da Ana cairia 6.000 na última capture sem uma linha para os 80.000 da reserva.
+- Responder 4xx quando a capture passa do teto. A rede já cobrou. A compra entra e fica marcada.
+- Marcar toda compra sem `final` como problema. O painel encheria de compra em voo.
+- Deixar o event antecipado reduzir o que ainda cabe aprovar. O desempate é aprovar e registrar o alerta.
+- Jogar cada capture no mês em que ela chegou.
+- Guardar uma projeção de saldo atualizada a cada linha.
+- Usar o id da rede como chave da tabela. A reemissão traz outro id para o mesmo fato.
+- Repositório por model, barramento de eventos e uma pasta `src/`. A rede, o painel e o portador leem os mesmos actions, e a resposta cabe no request.
+
+P1 continua sem execução. O enunciado não publica as cinco mensagens.
